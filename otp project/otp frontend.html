@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OTP Dashboard</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #4396e9, #42e9a0);
+      display:flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin:0;
+    }
+    .box {
+      background: #fff;
+      padding: 2rem;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      width: 320px;
+      text-align: center;
+    }
+    h2 {
+      margin-bottom: 1rem;
+      color: #333;
+    }
+    input {
+      width: 90%;
+      padding: 0.7rem;
+      margin-top: 1rem;
+      font-size: 1rem;
+      border: 2px solid #4396e9;
+      border-radius: 10px;
+      outline: none;
+      transition: 0.3s;
+    }
+    input:focus {
+      border-color: #42e9a0;
+      box-shadow: 0 0 8px rgba(66,233,160,0.5);
+    }
+    button {
+      width: 100%;
+      padding: 0.7rem;
+      margin-top: 1.5rem;
+      font-size: 1rem;
+      font-weight: bold;
+      background: linear-gradient(135deg, #4396e9, #42e9a0);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+    button:hover {
+      transform: scale(1.05);
+    }
+    #otpDisplay {
+      margin-top: 1.5rem;
+      font-size: 1.2rem;
+      font-weight: bold;
+      text-align: center;
+    }
+    #timer {
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h2>🔐 Send OTP</h2>
+    <input type="text" id="phoneInput" placeholder="Enter phone number" />
+    <button onclick="sendOtp()">Generate OTP</button>
+    <div id="otpDisplay"></div>
+    <div id="timer"></div>
+  </div>
+
+  <script>
+    // Store OTPs with timestamps locally
+    const otpStore = {};
+
+    async function sendOtp() {
+      const phone = document.getElementById('phoneInput').value.trim();
+      const otpDisplay = document.getElementById('otpDisplay');
+      const timerDisplay = document.getElementById('timer');
+
+      if (!phone) {
+        otpDisplay.innerText = "Please enter a phone number.";
+        otpDisplay.style.color = "red";
+        timerDisplay.innerText = "";
+        return;
+      }
+
+      const now = Date.now();
+      if (otpStore[phone] && now - otpStore[phone].timestamp < 60000) {
+        otpDisplay.innerText = `OTP already generated for ${phone}`;
+        otpDisplay.style.color = "orange";
+        const remaining = Math.ceil((60000 - (now - otpStore[phone].timestamp)) / 1000);
+        timerDisplay.innerText = `Try again in ${remaining} seconds`;
+        return;
+      }
+
+      try {
+        const response = await fetch('http://localhost:5000/generate-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone })
+        });
+
+        const data = await response.json();
+        otpDisplay.innerText = `Your OTP is: ${data.otp}`;
+        otpDisplay.style.color = "green";
+
+        // Save OTP with timestamp
+        otpStore[phone] = { otp: data.otp, timestamp: now };
+
+        startTimer(phone);
+      } catch (error) {
+        console.error('Error:', error);
+        otpDisplay.innerText = "Failed to fetch OTP.";
+        otpDisplay.style.color = "red";
+        timerDisplay.innerText = "";
+      }
+    }
+
+    function startTimer(phone) {
+      const timerDisplay = document.getElementById("timer");
+      let remaining = 60;
+
+      const interval = setInterval(() => {
+        remaining--;
+        if (remaining > 0) {
+          timerDisplay.innerText = `Valid for ${remaining} seconds`;
+        } else {
+          timerDisplay.innerText = "⏳ OTP expired";
+          delete otpStore[phone];
+          clearInterval(interval);
+        }
+      }, 1000);
+    }
+  </script>
+</body>
+</html>
